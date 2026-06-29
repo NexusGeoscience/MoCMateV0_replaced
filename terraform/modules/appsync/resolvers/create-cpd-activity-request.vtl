@@ -1,0 +1,26 @@
+## createCpdActivity — PutItem with user isolation
+#set($userId = $context.identity.sub)
+#set($activityId = $util.autoId())
+#set($now = $util.time.nowISO8601())
+{
+  "version": "2018-05-29",
+  "operation": "PutItem",
+  "key": {
+    "userId":     $util.dynamodb.toDynamoDBJson($userId),
+    "activityId": $util.dynamodb.toDynamoDBJson($activityId)
+  },
+  "attributeValues": {
+    "name":         $util.dynamodb.toDynamoDBJson($context.arguments.input.name),
+    "description":  $util.dynamodb.toDynamoDBJson($util.defaultIfNullOrEmpty($context.arguments.input.description, "")),
+    "categoryId":   $util.dynamodb.toDynamoDBJson($context.arguments.input.categoryId),
+    "activityDate": $util.dynamodb.toDynamoDBJson($context.arguments.input.activityDate),
+    "hours":        $util.dynamodb.toDynamoDBJson($context.arguments.input.hours),
+    "customFields": $util.dynamodb.toDynamoDBJson($util.defaultIfNull($context.arguments.input.customFields, {})),
+    "isLocked":     $util.dynamodb.toDynamoDBJson(false),
+    "createdAt":    $util.dynamodb.toDynamoDBJson($now),
+    "updatedAt":    $util.dynamodb.toDynamoDBJson($now)
+  },
+  "condition": {
+    "expression": "attribute_not_exists(activityId)"
+  }
+}

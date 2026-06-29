@@ -1,0 +1,10 @@
+## exportCpdReport — forward to PDF generator Lambda
+{
+  "version": "2018-05-29",
+  "operation": "Invoke",
+  "payload": {
+    "userId":    "$context.identity.sub",
+    "operation": "exportCpdReport",
+    "input":     $util.toJson($context.arguments.input)
+  }
+}

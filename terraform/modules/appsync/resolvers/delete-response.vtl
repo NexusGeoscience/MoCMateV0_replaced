@@ -1,0 +1,5 @@
+## Delete response — return true on success
+#if($context.error)
+  $util.error($context.error.message, $context.error.type)
+#end
+true

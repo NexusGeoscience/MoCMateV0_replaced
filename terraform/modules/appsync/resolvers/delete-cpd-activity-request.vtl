@@ -1,0 +1,17 @@
+## deleteCpdActivity — owner-only, locked activities cannot be deleted
+#set($userId = $context.identity.sub)
+{
+  "version": "2018-05-29",
+  "operation": "DeleteItem",
+  "key": {
+    "userId":     $util.dynamodb.toDynamoDBJson($userId),
+    "activityId": $util.dynamodb.toDynamoDBJson($context.arguments.activityId)
+  },
+  "condition": {
+    "expression": "userId = :userId AND isLocked = :false",
+    "expressionValues": {
+      ":userId": $util.dynamodb.toDynamoDBJson($userId),
+      ":false":  $util.dynamodb.toDynamoDBJson(false)
+    }
+  }
+}

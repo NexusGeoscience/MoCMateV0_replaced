@@ -1,0 +1,25 @@
+## saveDraft — upsert (create or update)
+#set($userId = $context.identity.sub)
+#set($now = $util.time.nowISO8601())
+#set($input = $context.arguments.input)
+#set($draftId = $util.defaultIfNull($input.draftId, $util.autoId()))
+## DynamoDB TTL: 90 days from now
+#set($ttl = $util.time.nowEpochSeconds() + 7776000)
+{
+  "version": "2018-05-29",
+  "operation": "PutItem",
+  "key": {
+    "userId":  $util.dynamodb.toDynamoDBJson($userId),
+    "draftId": $util.dynamodb.toDynamoDBJson($draftId)
+  },
+  "attributeValues": {
+    "name":         $util.dynamodb.toDynamoDBJson($util.defaultIfNull($input.name, null)),
+    "description":  $util.dynamodb.toDynamoDBJson($util.defaultIfNull($input.description, null)),
+    "categoryId":   $util.dynamodb.toDynamoDBJson($util.defaultIfNull($input.categoryId, null)),
+    "activityDate": $util.dynamodb.toDynamoDBJson($util.defaultIfNull($input.activityDate, null)),
+    "hours":        $util.dynamodb.toDynamoDBJson($util.defaultIfNull($input.hours, null)),
+    "customFields": $util.dynamodb.toDynamoDBJson($util.defaultIfNull($input.customFields, {})),
+    "savedAt":      $util.dynamodb.toDynamoDBJson($now),
+    "expiresAt":    $util.dynamodb.toDynamoDBJson($ttl)
+  }
+}

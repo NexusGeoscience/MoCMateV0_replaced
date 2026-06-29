@@ -1,0 +1,14 @@
+## listDrafts — Query on userId, sorted by savedAt descending
+{
+  "version": "2018-05-29",
+  "operation": "Query",
+  "query": {
+    "expression": "userId = :userId",
+    "expressionValues": {
+      ":userId": $util.dynamodb.toDynamoDBJson($context.identity.sub)
+    }
+  },
+  "scanIndexForward": false,
+  "limit":     $util.defaultIfNull($context.arguments.limit, 50),
+  "nextToken": $util.toJson($util.defaultIfNull($context.arguments.nextToken, null))
+}

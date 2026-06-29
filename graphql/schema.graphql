@@ -1,0 +1,399 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MoC-mate GraphQL Schema
+# Auth: Auth0 JWT (OPENID_CONNECT)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Scalars ───────────────────────────────────────────────────────────────────
+scalar AWSDateTime
+scalar AWSJSON
+
+# ── Enums ─────────────────────────────────────────────────────────────────────
+enum SubscriptionTier {
+  FREE
+  STANDARD
+  PREMIUM
+}
+
+enum LessonStructure {
+  SCROLLABLE
+  STEPPED
+}
+
+enum ContentType {
+  VIDEO
+  TEXT
+  QUIZ
+}
+
+enum ExportFormatStyle {
+  SUMMARY
+  DETAILED
+}
+
+# ── User ──────────────────────────────────────────────────────────────────────
+type User {
+  userId:           ID!
+  email:            String!
+  displayName:      String
+  subscriptionTier: SubscriptionTier!
+  groupId:          String!
+  createdAt:        AWSDateTime!
+  updatedAt:        AWSDateTime!
+}
+
+# ── CPD Category ──────────────────────────────────────────────────────────────
+type Category {
+  categoryId:  ID!
+  name:        String!
+  description: String
+  sortOrder:   Int
+  createdAt:   AWSDateTime!
+  updatedAt:   AWSDateTime!
+}
+
+# ── CPD Activity ──────────────────────────────────────────────────────────────
+type CpdActivity {
+  userId:         ID!
+  activityId:     ID!
+  name:           String!
+  description:    String
+  categoryId:     String!
+  categoryName:   String
+  activityDate:   String!        # ISO-8601 date YYYY-MM-DD
+  hours:          Float!
+  customFields:   AWSJSON        # Admin-defined extra fields as JSON blob
+  isLocked:       Boolean!       # true = auto-logged from lesson, cannot edit/delete
+  sourceLesson:   String         # lessonId if isLocked = true
+  createdAt:      AWSDateTime!
+  updatedAt:      AWSDateTime!
+}
+
+type CpdActivityConnection {
+  items:     [CpdActivity!]!
+  nextToken: String
+}
+
+# ── Draft ─────────────────────────────────────────────────────────────────────
+type Draft {
+  userId:      ID!
+  draftId:     ID!
+  name:        String
+  description: String
+  categoryId:  String
+  activityDate: String
+  hours:       Float
+  customFields: AWSJSON
+  savedAt:     AWSDateTime!
+  expiresAt:   Int              # Unix epoch, used for DynamoDB TTL
+}
+
+type DraftConnection {
+  items:     [Draft!]!
+  nextToken: String
+}
+
+# ── Lesson ────────────────────────────────────────────────────────────────────
+type ContentBlock {
+  blockId:      ID!
+  type:         ContentType!
+  order:        Int!
+  title:        String
+  body:         String           # for TEXT blocks
+  videoUrl:     String           # for VIDEO blocks (S3 pre-signed or CloudFront URL)
+  questions:    [QuizQuestion]   # for QUIZ blocks
+}
+
+type QuizQuestion {
+  questionId: ID!
+  text:       String!
+  options:    [String!]!
+  answerIndex: Int!
+}
+
+type Lesson {
+  lessonId:       ID!
+  title:          String!
+  description:    String
+  categoryId:     String!
+  categoryName:   String
+  durationMinutes: Int!
+  cpdCreditHours: Float!
+  structure:      LessonStructure!
+  contentBlocks:  [ContentBlock!]!
+  isPublished:    Boolean!
+  publishedAt:    AWSDateTime
+  createdAt:      AWSDateTime!
+  updatedAt:      AWSDateTime!
+}
+
+type LessonConnection {
+  items:     [Lesson!]!
+  nextToken: String
+}
+
+# ── Lesson Completion ─────────────────────────────────────────────────────────
+type LessonCompletion {
+  userId:          ID!
+  lessonId:        ID!
+  completedAt:     AWSDateTime!
+  cpdActivityId:   ID!           # ID of the auto-created CPD activity
+}
+
+# ── Export Preset ─────────────────────────────────────────────────────────────
+type ExportPreset {
+  userId:         ID!
+  presetId:       ID!
+  name:           String!
+  sortOrder:      Int!
+  dateRangeStart: String
+  dateRangeEnd:   String
+  categoryIds:    [String!]
+  formatStyle:    ExportFormatStyle!
+  includeSections: AWSJSON       # { summary: true, details: true, ... }
+  createdAt:      AWSDateTime!
+  updatedAt:      AWSDateTime!
+}
+
+type ExportPresetConnection {
+  items: [ExportPreset!]!
+}
+
+# ── Export Result ─────────────────────────────────────────────────────────────
+type ExportResult {
+  downloadUrl: String!           # S3 pre-signed URL, valid 1 hour
+  expiresAt:   AWSDateTime!
+  fileName:    String!
+}
+
+# ── User Group ────────────────────────────────────────────────────────────────
+type UserGroup {
+  groupId:          ID!
+  name:             String!
+  subscriptionTier: SubscriptionTier!
+  exportDefaults:   AWSJSON      # default export settings for this group
+  customFields:     AWSJSON      # custom CPD fields visible to this group
+  createdAt:        AWSDateTime!
+  updatedAt:        AWSDateTime!
+}
+
+# ── Recommendations ───────────────────────────────────────────────────────────
+type RecommendedLesson {
+  lesson: Lesson!
+  score:  Float
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Inputs
+# ─────────────────────────────────────────────────────────────────────────────
+
+input CreateCpdActivityInput {
+  name:         String!
+  description:  String
+  categoryId:   String!
+  activityDate: String!
+  hours:        Float!
+  customFields: AWSJSON
+}
+
+input UpdateCpdActivityInput {
+  activityId:   ID!
+  name:         String
+  description:  String
+  categoryId:   String
+  activityDate: String
+  hours:        Float
+  customFields: AWSJSON
+}
+
+input SaveDraftInput {
+  draftId:      ID            # omit to create new draft
+  name:         String
+  description:  String
+  categoryId:   String
+  activityDate: String
+  hours:        Float
+  customFields: AWSJSON
+}
+
+input CreateExportPresetInput {
+  name:            String!
+  dateRangeStart:  String
+  dateRangeEnd:    String
+  categoryIds:     [String!]
+  formatStyle:     ExportFormatStyle!
+  includeSections: AWSJSON
+}
+
+input UpdateExportPresetInput {
+  presetId:        ID!
+  name:            String
+  dateRangeStart:  String
+  dateRangeEnd:    String
+  categoryIds:     [String!]
+  formatStyle:     ExportFormatStyle
+  includeSections: AWSJSON
+  sortOrder:       Int
+}
+
+input ExportCpdReportInput {
+  dateRangeStart:  String
+  dateRangeEnd:    String
+  categoryIds:     [String!]
+  formatStyle:     ExportFormatStyle!
+  includeSections: AWSJSON
+  presetId:        ID          # optional: use a saved preset as starting point
+}
+
+input CompleteLessonInput {
+  lessonId: ID!
+}
+
+input RecordLessonInteractionInput {
+  lessonId:        ID!
+  eventType:       String!    # "view" | "start" | "complete"
+  sessionId:       String
+}
+
+# Admin inputs
+input CreateCategoryInput {
+  name:        String!
+  description: String
+  sortOrder:   Int
+}
+
+input UpdateCategoryInput {
+  categoryId:  ID!
+  name:        String
+  description: String
+  sortOrder:   Int
+}
+
+input CreateLessonInput {
+  title:           String!
+  description:     String
+  categoryId:      String!
+  durationMinutes: Int!
+  cpdCreditHours:  Float!
+  structure:       LessonStructure!
+  contentBlocks:   AWSJSON
+}
+
+input UpdateLessonInput {
+  lessonId:        ID!
+  title:           String
+  description:     String
+  categoryId:      String
+  durationMinutes: Int
+  cpdCreditHours:  Float
+  structure:       LessonStructure
+  contentBlocks:   AWSJSON
+  isPublished:     Boolean
+}
+
+input UpdateUserGroupInput {
+  groupId:       ID!
+  exportDefaults: AWSJSON
+  customFields:   AWSJSON
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Queries
+# ─────────────────────────────────────────────────────────────────────────────
+type Query {
+  # CPD
+  getCpdActivity(activityId: ID!): CpdActivity
+  listCpdActivities(
+    categoryId:     String
+    dateRangeStart: String
+    dateRangeEnd:   String
+    sortBy:         String      # "recent" | "oldest" | "category" | "hours"
+    limit:          Int
+    nextToken:      String
+  ): CpdActivityConnection!
+
+  # Drafts
+  listDrafts(limit: Int, nextToken: String): DraftConnection!
+  getDraft(draftId: ID!): Draft
+
+  # Lessons (Premium)
+  getLesson(lessonId: ID!): Lesson
+  listLessons(
+    categoryId: String
+    search:     String
+    limit:      Int
+    nextToken:  String
+  ): LessonConnection!
+  getRecommendedLessons(limit: Int): [RecommendedLesson!]!
+
+  # Export presets
+  listExportPresets: ExportPresetConnection!
+  getExportPreset(presetId: ID!): ExportPreset
+
+  # Profile
+  getMyProfile: User
+
+  # Categories
+  listCategories: [Category!]!
+
+  # User groups (admin)
+  listUserGroups: [UserGroup!]!
+  getUserGroup(groupId: ID!): UserGroup
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mutations
+# ─────────────────────────────────────────────────────────────────────────────
+type Mutation {
+  # CPD activities
+  createCpdActivity(input: CreateCpdActivityInput!): CpdActivity!
+  updateCpdActivity(input: UpdateCpdActivityInput!): CpdActivity!
+  deleteCpdActivity(activityId: ID!): Boolean!
+
+  # Drafts
+  saveDraft(input: SaveDraftInput!): Draft!
+  deleteDraft(draftId: ID!): Boolean!
+
+  # Lessons (completion triggers auto-log via Lambda)
+  completeLesson(input: CompleteLessonInput!): LessonCompletion!
+
+  # Personalise events
+  recordLessonInteraction(input: RecordLessonInteractionInput!): Boolean!
+
+  # PDF export (triggers Lambda, returns pre-signed S3 URL)
+  exportCpdReport(input: ExportCpdReportInput!): ExportResult!
+
+  # Export presets
+  createExportPreset(input: CreateExportPresetInput!): ExportPreset!
+  updateExportPreset(input: UpdateExportPresetInput!): ExportPreset!
+  deleteExportPreset(presetId: ID!): Boolean!
+
+  # Admin: categories
+  createCategory(input: CreateCategoryInput!): Category!
+  updateCategory(input: UpdateCategoryInput!): Category!
+  deleteCategory(categoryId: ID!): Boolean!
+
+  # Admin: lessons
+  createLesson(input: CreateLessonInput!): Lesson!
+  updateLesson(input: UpdateLessonInput!): Lesson!
+  deleteLesson(lessonId: ID!): Boolean!
+  publishLesson(lessonId: ID!): Lesson!
+
+  # Admin: user groups
+  updateUserGroup(input: UpdateUserGroupInput!): UserGroup!
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Subscriptions (real-time for future use)
+# ─────────────────────────────────────────────────────────────────────────────
+type Subscription {
+  onCpdActivityCreated(userId: ID!): CpdActivity
+    @aws_subscribe(mutations: ["createCpdActivity"])
+  onExportReady(userId: ID!): ExportResult
+    @aws_subscribe(mutations: ["exportCpdReport"])
+}
+
+schema {
+  query:        Query
+  mutation:     Mutation
+  subscription: Subscription
+}

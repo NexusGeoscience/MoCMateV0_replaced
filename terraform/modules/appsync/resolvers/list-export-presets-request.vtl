@@ -1,0 +1,12 @@
+## listExportPresets — all presets for current user, sorted by sortOrder
+{
+  "version": "2018-05-29",
+  "operation": "Query",
+  "query": {
+    "expression": "userId = :userId",
+    "expressionValues": {
+      ":userId": $util.dynamodb.toDynamoDBJson($context.identity.sub)
+    }
+  },
+  "limit": 10
+}

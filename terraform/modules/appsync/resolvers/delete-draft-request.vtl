@@ -1,0 +1,15 @@
+## deleteDraft — owner-only
+{
+  "version": "2018-05-29",
+  "operation": "DeleteItem",
+  "key": {
+    "userId":  $util.dynamodb.toDynamoDBJson($context.identity.sub),
+    "draftId": $util.dynamodb.toDynamoDBJson($context.arguments.draftId)
+  },
+  "condition": {
+    "expression": "userId = :userId",
+    "expressionValues": {
+      ":userId": $util.dynamodb.toDynamoDBJson($context.identity.sub)
+    }
+  }
+}

@@ -1,0 +1,38 @@
+## listLessons — only published lessons; optional category filter
+#set($args = $context.arguments)
+
+#if($util.isNull($args.categoryId) == false)
+  {
+    "version": "2018-05-29",
+    "operation": "Query",
+    "index": "categoryId-publishedAt-index",
+    "query": {
+      "expression": "categoryId = :categoryId",
+      "expressionValues": {
+        ":categoryId": $util.dynamodb.toDynamoDBJson($args.categoryId)
+      }
+    },
+    "filter": {
+      "expression": "isPublished = :true",
+      "expressionValues": {
+        ":true": $util.dynamodb.toDynamoDBJson(true)
+      }
+    },
+    "scanIndexForward": false,
+    "limit": $util.defaultIfNull($args.limit, 50),
+    "nextToken": $util.toJson($util.defaultIfNull($args.nextToken, null))
+  }
+#else
+  {
+    "version": "2018-05-29",
+    "operation": "Scan",
+    "filter": {
+      "expression": "isPublished = :true",
+      "expressionValues": {
+        ":true": $util.dynamodb.toDynamoDBJson(true)
+      }
+    },
+    "limit": $util.defaultIfNull($args.limit, 50),
+    "nextToken": $util.toJson($util.defaultIfNull($args.nextToken, null))
+  }
+#end

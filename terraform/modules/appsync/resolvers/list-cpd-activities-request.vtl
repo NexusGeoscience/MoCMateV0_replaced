@@ -1,0 +1,37 @@
+## listCpdActivities — Query on userId partition, optional category/date GSI
+#set($userId = $context.identity.sub)
+#set($args = $context.arguments)
+
+#if($util.isNull($args.categoryId) == false)
+  ## Use categoryId GSI
+  {
+    "version": "2018-05-29",
+    "operation": "Query",
+    "index": "userId-categoryId-index",
+    "query": {
+      "expression": "userId = :userId AND categoryId = :categoryId",
+      "expressionValues": {
+        ":userId":     $util.dynamodb.toDynamoDBJson($userId),
+        ":categoryId": $util.dynamodb.toDynamoDBJson($args.categoryId)
+      }
+    },
+    "scanIndexForward": false,
+    "limit":     $util.defaultIfNull($args.limit, 50),
+    "nextToken": $util.toJson($util.defaultIfNull($args.nextToken, null))
+  }
+#else
+  ## Base table query — sorted by activityId (ULID = time-ordered)
+  {
+    "version": "2018-05-29",
+    "operation": "Query",
+    "query": {
+      "expression": "userId = :userId",
+      "expressionValues": {
+        ":userId": $util.dynamodb.toDynamoDBJson($userId)
+      }
+    },
+    "scanIndexForward": false,
+    "limit":     $util.defaultIfNull($args.limit, 50),
+    "nextToken": $util.toJson($util.defaultIfNull($args.nextToken, null))
+  }
+#end

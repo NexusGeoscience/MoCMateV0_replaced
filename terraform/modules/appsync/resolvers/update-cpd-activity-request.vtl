@@ -1,0 +1,50 @@
+## updateCpdActivity — only owner can update, locked activities are rejected
+#set($userId = $context.identity.sub)
+#set($now = $util.time.nowISO8601())
+#set($expNames = {})
+#set($expValues = {})
+#set($setClauses = [])
+
+#if($util.isNull($context.arguments.input.name) == false)
+  $util.qr($expNames.put("#name", "name"))
+  $util.qr($expValues.put(":name", $util.dynamodb.toDynamoDB($context.arguments.input.name)))
+  $util.qr($setClauses.add("#name = :name"))
+#end
+#if($util.isNull($context.arguments.input.description) == false)
+  $util.qr($expNames.put("#description", "description"))
+  $util.qr($expValues.put(":description", $util.dynamodb.toDynamoDB($context.arguments.input.description)))
+  $util.qr($setClauses.add("#description = :description"))
+#end
+#if($util.isNull($context.arguments.input.categoryId) == false)
+  $util.qr($expValues.put(":categoryId", $util.dynamodb.toDynamoDB($context.arguments.input.categoryId)))
+  $util.qr($setClauses.add("categoryId = :categoryId"))
+#end
+#if($util.isNull($context.arguments.input.activityDate) == false)
+  $util.qr($expValues.put(":activityDate", $util.dynamodb.toDynamoDB($context.arguments.input.activityDate)))
+  $util.qr($setClauses.add("activityDate = :activityDate"))
+#end
+#if($util.isNull($context.arguments.input.hours) == false)
+  $util.qr($expValues.put(":hours", $util.dynamodb.toDynamoDB($context.arguments.input.hours)))
+  $util.qr($setClauses.add("hours = :hours"))
+#end
+$util.qr($expValues.put(":updatedAt", $util.dynamodb.toDynamoDB($now)))
+$util.qr($setClauses.add("updatedAt = :updatedAt"))
+$util.qr($expValues.put(":false", $util.dynamodb.toDynamoDB(false)))
+$util.qr($expValues.put(":userId", $util.dynamodb.toDynamoDB($userId)))
+
+{
+  "version": "2018-05-29",
+  "operation": "UpdateItem",
+  "key": {
+    "userId":     $util.dynamodb.toDynamoDBJson($userId),
+    "activityId": $util.dynamodb.toDynamoDBJson($context.arguments.input.activityId)
+  },
+  "update": {
+    "expression": "SET $util.join(", ", $setClauses)",
+    "expressionNames":  $util.toJson($expNames),
+    "expressionValues": $util.toJson($expValues)
+  },
+  "condition": {
+    "expression": "userId = :userId AND isLocked = :false"
+  }
+}

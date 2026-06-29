@@ -1,0 +1,13 @@
+variable "environment"          { type = string }
+variable "auth0_issuer_url"      { type = string }
+variable "dynamodb_table_arns"   { type = list(string) }
+variable "lambda_function_arns"  { type = list(string) }
+variable "lambda_invoke_arns"    { type = map(string) }
+variable "users_table_name"              { type = string }
+variable "cpd_activities_table_name"     { type = string }
+variable "drafts_table_name"             { type = string }
+variable "lessons_table_name"            { type = string }
+variable "lesson_completions_table_name" { type = string }
+variable "export_presets_table_name"     { type = string }
+variable "user_groups_table_name"        { type = string }
+variable "pdf_lambda_invoke_arn"         { type = string }

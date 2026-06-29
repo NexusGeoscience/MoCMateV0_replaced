@@ -1,0 +1,8 @@
+## getLesson — GetItem by lessonId
+{
+  "version": "2018-05-29",
+  "operation": "GetItem",
+  "key": {
+    "lessonId": $util.dynamodb.toDynamoDBJson($context.arguments.lessonId)
+  }
+}

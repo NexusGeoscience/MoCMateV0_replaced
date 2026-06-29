@@ -1,0 +1,11 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# NEVER commit terraform.tfvars to source control.
+
+aws_region        = "ap-southeast-2"
+environment       = "dev"
+auth0_issuer_url  = "https://YOUR_TENANT.au.auth0.com/"
+alarm_email       = "your-ops-email@example.com"
+monthly_budget_usd = "100"
+
+# Leave blank until you have created the Personalize event tracker
+personalize_event_tracker_arn = ""

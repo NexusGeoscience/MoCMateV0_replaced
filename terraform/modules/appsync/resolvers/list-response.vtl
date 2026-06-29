@@ -1,0 +1,8 @@
+## Standard list/connection response
+#if($context.error)
+  $util.error($context.error.message, $context.error.type)
+#end
+{
+  "items":     $util.toJson($context.result.items),
+  "nextToken": $util.toJson($context.result.nextToken)
+}
