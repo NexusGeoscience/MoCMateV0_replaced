@@ -14,7 +14,7 @@ personalize_event_tracker_arn = ""
 # Free trial length, counted from each user's first request after deploy
 trial_days = 30
 # Subscription product ID(s) created in App Store Connect / Play Console
-subscription_product_ids = ["mocmate_monthly"]
+subscription_product_ids = ["standard_monthly"]
 apple_bundle_id      = "com.example.mocmate"
 apple_issuer_id      = "00000000-0000-0000-0000-000000000000"
 apple_key_id         = "XXXXXXXXXX"

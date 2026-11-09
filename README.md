@@ -232,7 +232,7 @@ Learn tab, recommendations and auto-CPD from lessons.
 
 ### Setup checklist
 
-1. **App Store Connect:** create an auto-renewable subscription (e.g. `mocmate_monthly`).
+1. **App Store Connect:** create an auto-renewable subscription (e.g. `standard_monthly`).
    **Do not add a free-trial introductory offer**: the 30-day trial is handled by the server,
    so a store trial would give users two free months.
    Create an In-App Purchase API key (Users and Access › Integrations › In-App Purchase).
@@ -255,8 +255,8 @@ Learn tab, recommendations and auto-CPD from lessons.
    ```
 5. **Mobile app:** add to `.env`:
    ```
-   EXPO_PUBLIC_IAP_PRODUCT_ID_IOS=mocmate_monthly
-   EXPO_PUBLIC_IAP_PRODUCT_ID_ANDROID=mocmate_monthly
+   EXPO_PUBLIC_IAP_PRODUCT_ID_IOS=standard_monthly
+   EXPO_PUBLIC_IAP_PRODUCT_ID_ANDROID=standard_monthly
    EXPO_PUBLIC_ANDROID_PACKAGE_NAME=<package name>
    EXPO_PUBLIC_TERMS_URL=<terms of use URL>
    EXPO_PUBLIC_PRIVACY_URL=<privacy policy URL>

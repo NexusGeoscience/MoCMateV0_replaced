@@ -1,6 +1,15 @@
 # Handover: App Store Connect & Google Play setup for the MoC-mate subscription
 
 **For:** Claude in Chrome, working in the user's browser.
+> **Update:** both stores already have the subscription **"Standard" (`standard_monthly`)**:
+> Apple approved at A$5.99/month in the "MoC Mate" group, and Google base plan `monthly` active.
+> **Reuse it. Do not create `standard_monthly`.** The only changes to it are: on Apple, **end the
+> "Free for the first month" introductory offer**; on Google, **deactivate the `free-trial-1m`
+> offer**. Do not delete or change the product, its price, or the base plan. Before changing
+> anything, report how many active subscribers / trials each store shows. Skip the "create the
+> subscription" steps in 3.2 and 4.2; everything else (keys, service account, testers,
+> notifications) still applies.
+
 **Goal:** set up the store side of MoC-mate's new paid subscription: the subscription product
 on both stores, the API credentials the backend uses to verify purchases, and (once the backend
 is deployed) the server-notification URLs.
@@ -26,14 +35,14 @@ the technical detail. **No coding is needed here.** This handover is only consol
 
 | Item | Value |
 |---|---|
-| Subscription product ID (both stores) | `mocmate_monthly` |
+| Subscription product ID (both stores) | `standard_monthly` |
 | Google Play base plan ID | `monthly` |
 | Billing period | 1 month, auto-renewing |
-| Apple subscription group | `MoC-mate` |
+| Apple subscription group | `MoC Mate` (existing) |
 | Display name | `MoC-mate Subscription` |
 | Description | `Full access to CPD tracking, PDF export and Learn.` |
 
-If `mocmate_monthly` is already taken or can't be used, pick another ID, use the **same ID on
+If `standard_monthly` is already taken or can't be used, pick another ID, use the **same ID on
 both stores**, and report it back. The backend and app config must match it.
 
 ### Ask the user before starting
@@ -81,7 +90,7 @@ both stores**, and report it back. The backend and app config must match it.
    **Subscription Group** with reference name `MoC-mate`.
 3. In the group, **create a subscription**:
    * Reference name: `MoC-mate Monthly`
-   * Product ID: `mocmate_monthly`
+   * Product ID: `standard_monthly`
 4. Fill in the subscription:
    * **Subscription Duration:** 1 month
    * **Subscription Prices:** the price the user gave; base country Australia unless told
@@ -137,7 +146,7 @@ outstanding.
 ### 4.2 Create the subscription
 1. Select MoC-mate. Note the **package name** (shown under the app name, e.g. `com.…`).
 2. **Monetize with Play › Products › Subscriptions › Create subscription**
-   * Product ID: `mocmate_monthly`
+   * Product ID: `standard_monthly`
    * Name: `MoC-mate Subscription`
 3. Fill in **Subscription details**: benefits (e.g. "CPD tracking", "PDF export", "Learn
    lessons") and the description from the table.
@@ -195,7 +204,7 @@ Finish with this filled in. Leave an item blank if not done and say why.
 APPLE
   Paid Apps agreement:            Active / NOT ACTIVE
   Bundle ID:                      
-  Subscription product ID:        mocmate_monthly
+  Subscription product ID:        standard_monthly
   Subscription status:            (e.g. Missing Metadata – needs review screenshot)
   Price:                          
   In-App Purchase Key ID:         
@@ -207,7 +216,7 @@ APPLE
 GOOGLE
   Payments profile:               OK / MISSING
   Package name:                   
-  Subscription / base plan:       mocmate_monthly / monthly – Active / BLOCKED (reason)
+  Subscription / base plan:       standard_monthly / monthly – Active / BLOCKED (reason)
   Price:                          
   Cloud project ID:               
   Service account email:          
