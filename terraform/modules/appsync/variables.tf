@@ -10,7 +10,7 @@ variable "lessons_table_name"            { type = string }
 variable "lesson_completions_table_name" { type = string }
 variable "export_presets_table_name"     { type = string }
 variable "user_groups_table_name"        { type = string }
-variable "pdf_lambda_invoke_arn"         { type = string }
+variable "pdf_lambda_arn"                { type = string } # function ARN (not invoke ARN)
 variable "subscriptions_table_name"      { type = string }
 variable "subscription_lambda_arn"       { type = string }
 variable "trial_days" {

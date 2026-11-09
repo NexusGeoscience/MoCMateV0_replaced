@@ -100,7 +100,7 @@ module "appsync" {
   lesson_completions_table_name = module.dynamodb.lesson_completions_table_name
   export_presets_table_name     = module.dynamodb.export_presets_table_name
   user_groups_table_name        = module.dynamodb.user_groups_table_name
-  pdf_lambda_invoke_arn         = module.lambda.pdf_generator_invoke_arn
+  pdf_lambda_arn                = module.lambda.pdf_generator_function_arn
   subscriptions_table_name      = module.dynamodb.subscriptions_table_name
   subscription_lambda_arn       = module.lambda.subscription_function_arn
   trial_days                    = var.trial_days

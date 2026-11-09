@@ -233,7 +233,7 @@ resource "aws_appsync_datasource" "pdf_generator_lambda" {
   type             = "AWS_LAMBDA"
   service_role_arn = aws_iam_role.appsync_lambda.arn
   lambda_config {
-    function_arn = var.pdf_lambda_invoke_arn
+    function_arn = var.pdf_lambda_arn
   }
 }
 
