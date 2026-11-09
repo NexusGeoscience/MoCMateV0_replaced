@@ -15,7 +15,6 @@ interface AuthState {
 interface AuthContextType extends AuthState {
   login: () => Promise<void>;
   logout: () => Promise<void>;
-  isPremium: boolean;
 }
 
 // ── Storage keys ─────────────────────────────────────────────────────────────
@@ -121,10 +120,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState({ isAuthenticated: false, isLoading: false, user: null, accessToken: null });
   }, []);
 
-  const isPremium = state.user?.subscriptionTier === SubscriptionTier.PREMIUM;
-
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, isPremium }}>
+    <AuthContext.Provider value={{ ...state, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

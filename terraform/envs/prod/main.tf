@@ -69,6 +69,16 @@ module "lambda" {
   pdf_exports_bucket_name       = module.s3.pdf_exports_bucket_name
   pdf_exports_bucket_arn        = module.s3.pdf_exports_bucket_arn
   personalize_event_tracker_arn = var.personalize_event_tracker_arn
+
+  # Subscriptions
+  subscriptions_table_arn  = module.dynamodb.subscriptions_table_arn
+  subscriptions_table_name = module.dynamodb.subscriptions_table_name
+  trial_days               = var.trial_days
+  subscription_product_ids = var.subscription_product_ids
+  apple_bundle_id          = var.apple_bundle_id
+  apple_issuer_id          = var.apple_issuer_id
+  apple_key_id             = var.apple_key_id
+  android_package_name     = var.android_package_name
 }
 
 module "appsync" {
@@ -86,6 +96,9 @@ module "appsync" {
   export_presets_table_name     = module.dynamodb.export_presets_table_name
   user_groups_table_name        = module.dynamodb.user_groups_table_name
   pdf_lambda_invoke_arn         = module.lambda.pdf_generator_invoke_arn
+  subscriptions_table_name      = module.dynamodb.subscriptions_table_name
+  subscription_lambda_arn       = module.lambda.subscription_function_arn
+  trial_days                    = var.trial_days
 }
 
 module "vpc" {

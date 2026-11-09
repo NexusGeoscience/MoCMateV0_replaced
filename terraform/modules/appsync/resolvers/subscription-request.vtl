@@ -1,0 +1,10 @@
+## getSubscriptionStatus / verifyPurchase → subscription Lambda
+{
+  "version": "2018-05-29",
+  "operation": "Invoke",
+  "payload": {
+    "userId":    $util.toJson($context.identity.sub),
+    "operation": $util.toJson($context.info.fieldName),
+    "input":     $util.toJson($util.defaultIfNull($context.arguments.input, {}))
+  }
+}

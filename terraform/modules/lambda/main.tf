@@ -256,3 +256,115 @@ resource "aws_cloudwatch_log_group" "personalize_ingest" {
   name              = "/aws/lambda/${aws_lambda_function.personalize_ingest.function_name}"
   retention_in_days = 30
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. Subscription: free trial + App Store / Google Play purchase verification
+# ─────────────────────────────────────────────────────────────────────────────
+# Store credentials live in Secrets Manager. Terraform creates the empty
+# secrets; put the values in once, out of band (see README "Subscriptions").
+resource "aws_secretsmanager_secret" "apple_iap_key" {
+  name        = "${local.prefix}/apple-in-app-purchase-key"
+  description = "App Store Connect In-App Purchase API private key (.p8 contents)"
+}
+
+resource "aws_secretsmanager_secret" "google_play_service_account" {
+  name        = "${local.prefix}/google-play-service-account"
+  description = "Google Play Developer API service-account JSON key"
+}
+
+resource "aws_iam_role" "subscription" {
+  name               = "${local.prefix}-subscription-role"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+}
+
+resource "aws_iam_role_policy" "subscription" {
+  name = "subscription-policy"
+  role = aws_iam_role.subscription.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Subscriptions"
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"]
+        Resource = [
+          var.subscriptions_table_arn,
+          "${var.subscriptions_table_arn}/index/*"
+        ]
+      },
+      {
+        Sid      = "StoreCredentials"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = [
+          aws_secretsmanager_secret.apple_iap_key.arn,
+          aws_secretsmanager_secret.google_play_service_account.arn
+        ]
+      },
+      {
+        Sid    = "Logs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.prefix}-subscription:*"
+      }
+    ]
+  })
+}
+
+# Run lambda/subscription/build.sh first so vendor/ (PyJWT + cryptography) is included
+data "archive_file" "subscription" {
+  type        = "zip"
+  source_dir  = "${local.lambda_src}/subscription"
+  output_path = "${path.module}/dist/subscription.zip"
+  excludes    = ["build.sh", "requirements.txt"]
+}
+
+resource "aws_lambda_function" "subscription" {
+  function_name    = "${local.prefix}-subscription"
+  role             = aws_iam_role.subscription.arn
+  handler          = "index.handler"
+  runtime          = "python3.12"
+  filename         = data.archive_file.subscription.output_path
+  source_code_hash = data.archive_file.subscription.output_base64sha256
+  timeout          = 15
+  memory_size      = 256
+
+  environment {
+    variables = {
+      ENVIRONMENT                       = var.environment
+      SUBSCRIPTIONS_TABLE               = var.subscriptions_table_name
+      TRIAL_DAYS                        = tostring(var.trial_days)
+      ALLOWED_PRODUCT_IDS               = join(",", var.subscription_product_ids)
+      APPLE_BUNDLE_ID                   = var.apple_bundle_id
+      APPLE_ISSUER_ID                   = var.apple_issuer_id
+      APPLE_KEY_ID                      = var.apple_key_id
+      APPLE_PRIVATE_KEY_SECRET_ARN      = aws_secretsmanager_secret.apple_iap_key.arn
+      ANDROID_PACKAGE_NAME              = var.android_package_name
+      GOOGLE_SERVICE_ACCOUNT_SECRET_ARN = aws_secretsmanager_secret.google_play_service_account.arn
+    }
+  }
+
+  tracing_config { mode = "Active" }
+
+  tags = { Name = "${local.prefix}-subscription" }
+}
+
+resource "aws_cloudwatch_log_group" "subscription" {
+  name              = "/aws/lambda/${aws_lambda_function.subscription.function_name}"
+  retention_in_days = 30
+}
+
+# Public HTTPS endpoint for store server notifications:
+#   <url>apple   → App Store Connect › App › App Store Server Notifications (V2)
+#   <url>google  → Google Cloud Pub/Sub push subscription for Play RTDN
+# Notification bodies are never trusted: the Lambda re-fetches the
+# subscription from Apple / Google before changing anything.
+resource "aws_lambda_function_url" "subscription_notifications" {
+  function_name      = aws_lambda_function.subscription.function_name
+  authorization_type = "NONE"
+}

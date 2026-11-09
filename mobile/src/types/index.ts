@@ -8,6 +8,19 @@ export enum SubscriptionTier {
   PREMIUM = 'PREMIUM',
 }
 
+export type SubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'CANCELLED' | 'GRACE_PERIOD' | 'EXPIRED';
+
+export interface SubscriptionInfo {
+  status: SubscriptionStatus;
+  isEntitled: boolean;
+  trialEndsAt: string;
+  expiresAt?: string | null;
+  autoRenewing: boolean;
+  platform?: 'IOS' | 'ANDROID' | null;
+  productId?: string | null;
+  appAccountToken: string;
+}
+
 export enum LessonStructure {
   SCROLLABLE = 'SCROLLABLE',
   STEPPED = 'STEPPED',
@@ -148,6 +161,7 @@ export type LearnStackParamList = {
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
+  Subscription: undefined;
   ExportPresets: undefined;
   ExportOptions: { presetId?: string };
 };

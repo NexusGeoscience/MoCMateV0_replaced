@@ -21,3 +21,11 @@ output "pdf_generator_function_name" {
 output "dynamodb_table_names" {
   value = module.dynamodb.all_table_names
 }
+
+output "subscription_notifications_url" {
+  description = "Append 'apple' (App Store Server Notifications V2) or 'google' (Play RTDN Pub/Sub push)"
+  value       = module.lambda.subscription_notifications_url
+}
+
+output "apple_iap_key_secret_arn"               { value = module.lambda.apple_iap_key_secret_arn }
+output "google_play_service_account_secret_arn" { value = module.lambda.google_play_service_account_secret_arn }

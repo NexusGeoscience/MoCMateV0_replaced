@@ -13,7 +13,7 @@ lesson content, CPD categories, and user groups. Built on AWS serverless infrast
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Mobile App (React Native / Expo)          │
-│  CPD Tracker  │  Learn Tab (Premium)  │  Profile / Export        │
+│  CPD Tracker  │  Learn Tab            │  Profile / Export        │
 └───────┬───────────────────┬───────────────────┬─────────────────┘
         │ GraphQL           │ GraphQL           │ GraphQL
         ▼                   ▼                   ▼
@@ -67,9 +67,9 @@ moc-mate/
 │       ├── navigation/         # Tab + stack navigators
 │       ├── screens/
 │       │   ├── cpd/            # CPD tracker screens
-│       │   ├── learn/          # Learn tab screens (Premium)
+│       │   ├── learn/          # Learn tab screens
 │       │   └── profile/        # Profile + export settings
-│       ├── services/           # Apollo client, Auth0
+│       ├── services/           # Apollo client, Auth0, subscription / in-app purchase
 │       ├── types/              # TypeScript types
 │       └── config/             # Environment config
 ├── admin-dashboard/            # React web app (Vite)
@@ -198,17 +198,73 @@ npm run dev
 
 ---
 
-## Subscription Tiers
+## Subscription (app access)
 
-| Feature | Free | Standard | Premium |
-|---------|------|----------|---------|
-| CPD Activity Tracking | ✅ | ✅ | ✅ |
-| Draft Saving | ✅ | ✅ | ✅ |
-| PDF Export | ✅ | ✅ | ✅ |
-| Export Presets (10 max) | ✅ | ✅ | ✅ |
-| Learn Tab (eLearning) | ❌ | ❌ | ✅ |
-| Personalised Recommendations | ❌ | ❌ | ✅ |
-| Auto-CPD from Lessons | ❌ | ❌ | ✅ |
+MoC-mate is a paid app with a **free first month**:
+
+| | First 30 days | After 30 days |
+|---|---|---|
+| No subscription | ✅ Full app (free trial) | 🔒 Paywall only |
+| Subscribed (one monthly plan via App Store / Google Play) | ✅ Full app | ✅ Full app |
+
+The subscription unlocks everything: CPD tracking, drafts, PDF export, export presets, the
+Learn tab, recommendations and auto-CPD from lessons.
+
+### How it is enforced
+
+* **Server-side, on every request.** Every user-facing AppSync resolver is a pipeline whose
+  first step (`checkEntitlement`) reads the caller's record in the `subscriptions` table and
+  rejects the request with `errorType: SubscriptionRequired` unless the trial or a paid
+  subscription is still current. Old app versions and direct API calls are locked out too.
+  **Any new user-facing resolver must be added to `local.gated_resolvers` in
+  `terraform/modules/appsync/main.tf`**, never as a plain UNIT resolver.
+* **Trial clock.** A user's 30 days (`trial_days`) start on their first API request after
+  this is deployed, so existing users get a fresh month from the release, and new users
+  get a month from sign-up.
+* **Purchases** are made with the native store sheet (`react-native-iap`) and verified by the
+  `subscription` Lambda directly with Apple's App Store Server API / Google's Play Developer
+  API. Each purchase carries a per-user `appAccountToken`, so a receipt can only unlock the
+  account that bought it.
+* **Renewals, cancellations, refunds** arrive as App Store Server Notifications V2 /
+  Play Real-time Developer Notifications at the Lambda Function URL. The Lambda re-fetches
+  the subscription from the store (it never trusts the notification body). The app also
+  re-checks on launch and when it returns to the foreground.
+
+### Setup checklist
+
+1. **App Store Connect:** create an auto-renewable subscription (e.g. `mocmate_monthly`).
+   **Do not add a free-trial introductory offer**: the 30-day trial is handled by the server,
+   so a store trial would give users two free months.
+   Create an In-App Purchase API key (Users and Access › Integrations › In-App Purchase).
+   Set App Store Server Notifications **V2** (production and sandbox) to
+   `<subscription_notifications_url>apple`.
+2. **Google Play Console:** create a subscription with one monthly base plan and the same
+   product ID, again **without a free-trial offer**. Create a Google Cloud service account,
+   grant it *View financial data* and *Manage orders and subscriptions* in Play Console › Users
+   and permissions. Enable Real-time developer notifications to a Pub/Sub topic with a **push**
+   subscription to `<subscription_notifications_url>google`.
+3. **Terraform:** set `subscription_product_ids`, `apple_bundle_id`, `apple_issuer_id`,
+   `apple_key_id` and `android_package_name` in `terraform.tfvars`. Run
+   `lambda/subscription/build.sh`, then `terraform apply`.
+4. **Secrets** (once, outside Terraform):
+   ```bash
+   aws secretsmanager put-secret-value --secret-id <apple_iap_key_secret_arn> \
+     --secret-string file://SubscriptionKey_XXXXXXXXXX.p8
+   aws secretsmanager put-secret-value --secret-id <google_play_service_account_secret_arn> \
+     --secret-string file://service-account.json
+   ```
+5. **Mobile app:** add to `.env`:
+   ```
+   EXPO_PUBLIC_IAP_PRODUCT_ID_IOS=mocmate_monthly
+   EXPO_PUBLIC_IAP_PRODUCT_ID_ANDROID=mocmate_monthly
+   EXPO_PUBLIC_ANDROID_PACKAGE_NAME=<package name>
+   EXPO_PUBLIC_TERMS_URL=<terms of use URL>
+   EXPO_PUBLIC_PRIVACY_URL=<privacy policy URL>
+   ```
+   and add `["react-native-iap", { "paymentProvider": "Play Store" }]` to `plugins` in the Expo
+   app config. In-app purchases need a development / EAS build (not Expo Go).
+6. **Release order:** deploy the backend and publish the app update at the same time. The
+   trial clock starts for each user at their first request after the backend deploy.
 
 ---
 

@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useAuth } from '../services/auth';
+import { useSubscription } from '../services/subscription';
 import { CpdStackParamList, LearnStackParamList, ProfileStackParamList } from '../types';
 
 // CPD screens
@@ -22,8 +23,9 @@ import { LessonContentScreen } from '../screens/learn/LessonContentScreen';
 import { ProfileHomeScreen } from '../screens/profile/ProfileHomeScreen';
 import { ExportPresetsScreen } from '../screens/profile/ExportPresetsScreen';
 
-// Auth screen
+// Auth & subscription screens
 import { LoginScreen } from '../screens/LoginScreen';
+import { PaywallScreen } from '../screens/PaywallScreen';
 
 // ── Stack navigators ─────────────────────────────────────────────────────────
 const CpdStack = createNativeStackNavigator<CpdStackParamList>();
@@ -57,6 +59,7 @@ function ProfileNavigator() {
   return (
     <ProfileStack.Navigator screenOptions={{ headerBackTitleVisible: false }}>
       <ProfileStack.Screen name="ProfileHome" component={ProfileHomeScreen} options={{ title: 'Profile' }} />
+      <ProfileStack.Screen name="Subscription" component={PaywallScreen} options={{ title: 'Subscription' }} />
       <ProfileStack.Screen name="ExportPresets" component={ExportPresetsScreen} options={{ title: 'Export Presets' }} />
       <ProfileStack.Screen name="ExportOptions" component={ExportOptionsScreen} options={{ title: 'Export Report' }} />
     </ProfileStack.Navigator>
@@ -65,9 +68,10 @@ function ProfileNavigator() {
 
 // ── Root navigator ───────────────────────────────────────────────────────────
 export function RootNavigator() {
-  const { isAuthenticated, isLoading, isPremium } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  const { isEntitled, isLoading: isSubscriptionLoading } = useSubscription();
 
-  if (isLoading) {
+  if (isLoading || (isAuthenticated && isSubscriptionLoading)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
@@ -77,6 +81,11 @@ export function RootNavigator() {
 
   if (!isAuthenticated) {
     return <LoginScreen />;
+  }
+
+  // Free month over and no active subscription: the whole app is locked.
+  if (!isEntitled) {
+    return <PaywallScreen locked />;
   }
 
   return (
@@ -92,13 +101,11 @@ export function RootNavigator() {
         component={CpdNavigator}
         options={{ tabBarLabel: 'CPD' }}
       />
-      {isPremium && (
-        <Tab.Screen
-          name="Learn"
-          component={LearnNavigator}
-          options={{ tabBarLabel: 'Learn' }}
-        />
-      )}
+      <Tab.Screen
+        name="Learn"
+        component={LearnNavigator}
+        options={{ tabBarLabel: 'Learn' }}
+      />
       <Tab.Screen
         name="Profile"
         component={ProfileNavigator}

@@ -22,6 +22,9 @@ output "user_groups_table_arn"         { value = aws_dynamodb_table.user_groups.
 output "categories_table_name"         { value = aws_dynamodb_table.categories.name }
 output "categories_table_arn"          { value = aws_dynamodb_table.categories.arn }
 
+output "subscriptions_table_name"      { value = aws_dynamodb_table.subscriptions.name }
+output "subscriptions_table_arn"       { value = aws_dynamodb_table.subscriptions.arn }
+
 output "all_table_arns" {
   value = [
     aws_dynamodb_table.users.arn,
@@ -32,6 +35,7 @@ output "all_table_arns" {
     aws_dynamodb_table.export_presets.arn,
     aws_dynamodb_table.user_groups.arn,
     aws_dynamodb_table.categories.arn,
+    aws_dynamodb_table.subscriptions.arn,
   ]
 }
 
@@ -45,5 +49,6 @@ output "all_table_names" {
     export_presets     = aws_dynamodb_table.export_presets.name
     user_groups        = aws_dynamodb_table.user_groups.name
     categories         = aws_dynamodb_table.categories.name
+    subscriptions      = aws_dynamodb_table.subscriptions.name
   }
 }

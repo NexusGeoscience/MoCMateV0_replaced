@@ -1,0 +1,20 @@
+## check-entitlement (pipeline step 1 of every gated resolver)
+## Upserts the caller's subscription record. if_not_exists starts the free
+## trial on a user's first request and never touches it again; UpdateItem
+## returns the full record for the response template to check.
+#set($now = $util.time.nowEpochSeconds())
+#set($trialEnd = $now + ${trial_seconds})
+{
+  "version": "2018-05-29",
+  "operation": "UpdateItem",
+  "key": {
+    "userId": $util.dynamodb.toDynamoDBJson($context.identity.sub)
+  },
+  "update": {
+    "expression": "SET trialStartedAt = if_not_exists(trialStartedAt, :now), trialEndsAt = if_not_exists(trialEndsAt, :trialEnd)",
+    "expressionValues": {
+      ":now":      $util.dynamodb.toDynamoDBJson($now),
+      ":trialEnd": $util.dynamodb.toDynamoDBJson($trialEnd)
+    }
+  }
+}

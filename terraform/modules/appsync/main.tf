@@ -206,6 +206,27 @@ resource "aws_appsync_datasource" "user_groups" {
   }
 }
 
+resource "aws_appsync_datasource" "subscriptions" {
+  api_id           = aws_appsync_graphql_api.main.id
+  name             = "SubscriptionsTable"
+  type             = "AMAZON_DYNAMODB"
+  service_role_arn = aws_iam_role.appsync_dynamodb.arn
+  dynamodb_config {
+    table_name = var.subscriptions_table_name
+    region     = "ap-southeast-2"
+  }
+}
+
+resource "aws_appsync_datasource" "subscription_lambda" {
+  api_id           = aws_appsync_graphql_api.main.id
+  name             = "SubscriptionLambda"
+  type             = "AWS_LAMBDA"
+  service_role_arn = aws_iam_role.appsync_lambda.arn
+  lambda_config {
+    function_arn = var.subscription_lambda_arn
+  }
+}
+
 resource "aws_appsync_datasource" "pdf_generator_lambda" {
   api_id           = aws_appsync_graphql_api.main.id
   name             = "PdfGeneratorLambda"
@@ -217,149 +238,148 @@ resource "aws_appsync_datasource" "pdf_generator_lambda" {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Resolvers — direct Lambda for mutations that need compute
+# Subscription resolvers (NOT gated, so an expired user can see the paywall,
+# subscribe and restore purchases)
 # ─────────────────────────────────────────────────────────────────────────────
-
-# exportCpdReport → PDF generator Lambda
-resource "aws_appsync_resolver" "export_cpd_report" {
+resource "aws_appsync_resolver" "get_subscription_status" {
   api_id      = aws_appsync_graphql_api.main.id
-  type        = "Mutation"
-  field       = "exportCpdReport"
-  data_source = aws_appsync_datasource.pdf_generator_lambda.name
+  type        = "Query"
+  field       = "getSubscriptionStatus"
+  data_source = aws_appsync_datasource.subscription_lambda.name
   kind        = "UNIT"
 
-  request_template  = file("${path.module}/resolvers/export-cpd-report-request.vtl")
+  request_template  = file("${path.module}/resolvers/subscription-request.vtl")
   response_template = file("${path.module}/resolvers/lambda-response.vtl")
 }
 
-# listCpdActivities — DynamoDB Query resolver
-resource "aws_appsync_resolver" "list_cpd_activities" {
-  api_id      = aws_appsync_graphql_api.main.id
-  type        = "Query"
-  field       = "listCpdActivities"
-  data_source = aws_appsync_datasource.cpd_activities.name
-  kind        = "UNIT"
-
-  request_template  = file("${path.module}/resolvers/list-cpd-activities-request.vtl")
-  response_template = file("${path.module}/resolvers/list-response.vtl")
-}
-
-# getCpdActivity — DynamoDB GetItem
-resource "aws_appsync_resolver" "get_cpd_activity" {
-  api_id      = aws_appsync_graphql_api.main.id
-  type        = "Query"
-  field       = "getCpdActivity"
-  data_source = aws_appsync_datasource.cpd_activities.name
-  kind        = "UNIT"
-
-  request_template  = file("${path.module}/resolvers/get-cpd-activity-request.vtl")
-  response_template = file("${path.module}/resolvers/item-response.vtl")
-}
-
-# createCpdActivity
-resource "aws_appsync_resolver" "create_cpd_activity" {
+resource "aws_appsync_resolver" "verify_purchase" {
   api_id      = aws_appsync_graphql_api.main.id
   type        = "Mutation"
-  field       = "createCpdActivity"
-  data_source = aws_appsync_datasource.cpd_activities.name
+  field       = "verifyPurchase"
+  data_source = aws_appsync_datasource.subscription_lambda.name
   kind        = "UNIT"
 
-  request_template  = file("${path.module}/resolvers/create-cpd-activity-request.vtl")
-  response_template = file("${path.module}/resolvers/item-response.vtl")
+  request_template  = file("${path.module}/resolvers/subscription-request.vtl")
+  response_template = file("${path.module}/resolvers/lambda-response.vtl")
 }
 
-# updateCpdActivity
-resource "aws_appsync_resolver" "update_cpd_activity" {
-  api_id      = aws_appsync_graphql_api.main.id
-  type        = "Mutation"
-  field       = "updateCpdActivity"
-  data_source = aws_appsync_datasource.cpd_activities.name
-  kind        = "UNIT"
-
-  request_template  = file("${path.module}/resolvers/update-cpd-activity-request.vtl")
-  response_template = file("${path.module}/resolvers/item-response.vtl")
+# ─────────────────────────────────────────────────────────────────────────────
+# Gated resolvers: everything else in the app.
+# Each is a PIPELINE: check-entitlement first, then the real data operation.
+# A user whose free trial and paid subscription have both ended gets a
+# "SubscriptionRequired" error instead of data.
+# Any new user-facing resolver MUST be added to this map, not as a UNIT resolver.
+# ─────────────────────────────────────────────────────────────────────────────
+resource "aws_appsync_function" "check_entitlement" {
+  api_id                    = aws_appsync_graphql_api.main.id
+  name                      = "checkEntitlement"
+  data_source               = aws_appsync_datasource.subscriptions.name
+  function_version          = "2018-05-29"
+  request_mapping_template  = templatefile("${path.module}/resolvers/check-entitlement-request.vtl.tftpl", {
+    trial_seconds = var.trial_days * 86400
+  })
+  response_mapping_template = file("${path.module}/resolvers/check-entitlement-response.vtl")
 }
 
-# deleteCpdActivity
-resource "aws_appsync_resolver" "delete_cpd_activity" {
-  api_id      = aws_appsync_graphql_api.main.id
-  type        = "Mutation"
-  field       = "deleteCpdActivity"
-  data_source = aws_appsync_datasource.cpd_activities.name
-  kind        = "UNIT"
-
-  request_template  = file("${path.module}/resolvers/delete-cpd-activity-request.vtl")
-  response_template = file("${path.module}/resolvers/delete-response.vtl")
+locals {
+  gated_resolvers = {
+    # CPD activities
+    listCpdActivities = { type = "Query",    data_source = aws_appsync_datasource.cpd_activities.name, request = "list-cpd-activities-request.vtl",  response = "list-response.vtl" }
+    getCpdActivity    = { type = "Query",    data_source = aws_appsync_datasource.cpd_activities.name, request = "get-cpd-activity-request.vtl",     response = "item-response.vtl" }
+    createCpdActivity = { type = "Mutation", data_source = aws_appsync_datasource.cpd_activities.name, request = "create-cpd-activity-request.vtl",  response = "item-response.vtl" }
+    updateCpdActivity = { type = "Mutation", data_source = aws_appsync_datasource.cpd_activities.name, request = "update-cpd-activity-request.vtl",  response = "item-response.vtl" }
+    deleteCpdActivity = { type = "Mutation", data_source = aws_appsync_datasource.cpd_activities.name, request = "delete-cpd-activity-request.vtl",  response = "delete-response.vtl" }
+    # Drafts
+    listDrafts  = { type = "Query",    data_source = aws_appsync_datasource.drafts.name, request = "list-drafts-request.vtl",  response = "list-response.vtl" }
+    saveDraft   = { type = "Mutation", data_source = aws_appsync_datasource.drafts.name, request = "save-draft-request.vtl",   response = "item-response.vtl" }
+    deleteDraft = { type = "Mutation", data_source = aws_appsync_datasource.drafts.name, request = "delete-draft-request.vtl", response = "delete-response.vtl" }
+    # Lessons
+    listLessons = { type = "Query", data_source = aws_appsync_datasource.lessons.name, request = "list-lessons-request.vtl", response = "list-response.vtl" }
+    getLesson   = { type = "Query", data_source = aws_appsync_datasource.lessons.name, request = "get-lesson-request.vtl",   response = "item-response.vtl" }
+    # Export
+    listExportPresets = { type = "Query",    data_source = aws_appsync_datasource.export_presets.name,       request = "list-export-presets-request.vtl", response = "list-response.vtl" }
+    exportCpdReport   = { type = "Mutation", data_source = aws_appsync_datasource.pdf_generator_lambda.name, request = "export-cpd-report-request.vtl",   response = "lambda-response.vtl" }
+  }
 }
 
-# listDrafts
-resource "aws_appsync_resolver" "list_drafts" {
-  api_id      = aws_appsync_graphql_api.main.id
-  type        = "Query"
-  field       = "listDrafts"
-  data_source = aws_appsync_datasource.drafts.name
-  kind        = "UNIT"
+resource "aws_appsync_function" "gated" {
+  for_each = local.gated_resolvers
 
-  request_template  = file("${path.module}/resolvers/list-drafts-request.vtl")
-  response_template = file("${path.module}/resolvers/list-response.vtl")
+  api_id                    = aws_appsync_graphql_api.main.id
+  name                      = each.key
+  data_source               = each.value.data_source
+  function_version          = "2018-05-29"
+  request_mapping_template  = file("${path.module}/resolvers/${each.value.request}")
+  response_mapping_template = file("${path.module}/resolvers/${each.value.response}")
 }
 
-# saveDraft
-resource "aws_appsync_resolver" "save_draft" {
-  api_id      = aws_appsync_graphql_api.main.id
-  type        = "Mutation"
-  field       = "saveDraft"
-  data_source = aws_appsync_datasource.drafts.name
-  kind        = "UNIT"
+resource "aws_appsync_resolver" "gated" {
+  for_each = local.gated_resolvers
 
-  request_template  = file("${path.module}/resolvers/save-draft-request.vtl")
-  response_template = file("${path.module}/resolvers/item-response.vtl")
+  api_id = aws_appsync_graphql_api.main.id
+  type   = each.value.type
+  field  = each.key
+  kind   = "PIPELINE"
+
+  request_template  = "{}"
+  response_template = "$util.toJson($ctx.prev.result)"
+
+  pipeline_config {
+    functions = [
+      aws_appsync_function.check_entitlement.function_id,
+      aws_appsync_function.gated[each.key].function_id,
+    ]
+  }
 }
 
-# deleteDraft
-resource "aws_appsync_resolver" "delete_draft" {
-  api_id      = aws_appsync_graphql_api.main.id
-  type        = "Mutation"
-  field       = "deleteDraft"
-  data_source = aws_appsync_datasource.drafts.name
-  kind        = "UNIT"
-
-  request_template  = file("${path.module}/resolvers/delete-draft-request.vtl")
-  response_template = file("${path.module}/resolvers/delete-response.vtl")
+# The resolvers above used to be individual UNIT resolvers; move them in
+# state so Terraform updates each in place instead of deleting and recreating
+# (two resolvers cannot exist for the same field at once).
+moved {
+  from = aws_appsync_resolver.list_cpd_activities
+  to   = aws_appsync_resolver.gated["listCpdActivities"]
 }
-
-# listLessons
-resource "aws_appsync_resolver" "list_lessons" {
-  api_id      = aws_appsync_graphql_api.main.id
-  type        = "Query"
-  field       = "listLessons"
-  data_source = aws_appsync_datasource.lessons.name
-  kind        = "UNIT"
-
-  request_template  = file("${path.module}/resolvers/list-lessons-request.vtl")
-  response_template = file("${path.module}/resolvers/list-response.vtl")
+moved {
+  from = aws_appsync_resolver.get_cpd_activity
+  to   = aws_appsync_resolver.gated["getCpdActivity"]
 }
-
-# getLesson
-resource "aws_appsync_resolver" "get_lesson" {
-  api_id      = aws_appsync_graphql_api.main.id
-  type        = "Query"
-  field       = "getLesson"
-  data_source = aws_appsync_datasource.lessons.name
-  kind        = "UNIT"
-
-  request_template  = file("${path.module}/resolvers/get-lesson-request.vtl")
-  response_template = file("${path.module}/resolvers/item-response.vtl")
+moved {
+  from = aws_appsync_resolver.create_cpd_activity
+  to   = aws_appsync_resolver.gated["createCpdActivity"]
 }
-
-# listExportPresets
-resource "aws_appsync_resolver" "list_export_presets" {
-  api_id      = aws_appsync_graphql_api.main.id
-  type        = "Query"
-  field       = "listExportPresets"
-  data_source = aws_appsync_datasource.export_presets.name
-  kind        = "UNIT"
-
-  request_template  = file("${path.module}/resolvers/list-export-presets-request.vtl")
-  response_template = file("${path.module}/resolvers/list-response.vtl")
+moved {
+  from = aws_appsync_resolver.update_cpd_activity
+  to   = aws_appsync_resolver.gated["updateCpdActivity"]
+}
+moved {
+  from = aws_appsync_resolver.delete_cpd_activity
+  to   = aws_appsync_resolver.gated["deleteCpdActivity"]
+}
+moved {
+  from = aws_appsync_resolver.list_drafts
+  to   = aws_appsync_resolver.gated["listDrafts"]
+}
+moved {
+  from = aws_appsync_resolver.save_draft
+  to   = aws_appsync_resolver.gated["saveDraft"]
+}
+moved {
+  from = aws_appsync_resolver.delete_draft
+  to   = aws_appsync_resolver.gated["deleteDraft"]
+}
+moved {
+  from = aws_appsync_resolver.list_lessons
+  to   = aws_appsync_resolver.gated["listLessons"]
+}
+moved {
+  from = aws_appsync_resolver.get_lesson
+  to   = aws_appsync_resolver.gated["getLesson"]
+}
+moved {
+  from = aws_appsync_resolver.list_export_presets
+  to   = aws_appsync_resolver.gated["listExportPresets"]
+}
+moved {
+  from = aws_appsync_resolver.export_cpd_report
+  to   = aws_appsync_resolver.gated["exportCpdReport"]
 }

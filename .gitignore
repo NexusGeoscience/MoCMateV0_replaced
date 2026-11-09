@@ -10,6 +10,7 @@ terraform.tfvars
 
 # Lambda build artifacts
 terraform/modules/lambda/dist/
+lambda/*/vendor/
 
 # Node
 node_modules/

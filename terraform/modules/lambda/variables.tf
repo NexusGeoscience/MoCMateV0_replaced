@@ -16,3 +16,40 @@ variable "personalize_event_tracker_arn" {
   type    = string
   default = ""
 }
+
+# ── Subscriptions ─────────────────────────────────────────────────────────────
+variable "subscriptions_table_arn"  { type = string }
+variable "subscriptions_table_name" { type = string }
+
+variable "trial_days" {
+  type    = number
+  default = 30
+}
+
+variable "subscription_product_ids" {
+  description = "App Store / Google Play subscription product IDs that unlock the app"
+  type        = list(string)
+  default     = []
+}
+
+variable "apple_bundle_id" {
+  type    = string
+  default = ""
+}
+
+variable "apple_issuer_id" {
+  description = "App Store Connect API issuer ID"
+  type        = string
+  default     = ""
+}
+
+variable "apple_key_id" {
+  description = "App Store Connect In-App Purchase key ID"
+  type        = string
+  default     = ""
+}
+
+variable "android_package_name" {
+  type    = string
+  default = ""
+}

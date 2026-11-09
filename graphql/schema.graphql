@@ -14,6 +14,20 @@ enum SubscriptionTier {
   PREMIUM
 }
 
+# App access: free trial, then one paid App Store / Google Play subscription
+enum SubscriptionStatus {
+  TRIAL          # inside the free first month
+  ACTIVE         # paid, auto-renewing
+  CANCELLED      # paid, auto-renew turned off; usable until expiresAt
+  GRACE_PERIOD   # renewal payment failed; store is retrying, still usable
+  EXPIRED        # no access: show the paywall
+}
+
+enum StorePlatform {
+  IOS
+  ANDROID
+}
+
 enum LessonStructure {
   SCROLLABLE
   STEPPED
@@ -176,6 +190,18 @@ type UserGroup {
   updatedAt:        AWSDateTime!
 }
 
+# ── Subscription (app access) ─────────────────────────────────────────────────
+type SubscriptionInfo {
+  status:          SubscriptionStatus!
+  isEntitled:      Boolean!       # false = every other API call is rejected
+  trialEndsAt:     AWSDateTime!
+  expiresAt:       AWSDateTime    # end of the current paid period
+  autoRenewing:    Boolean!
+  platform:        StorePlatform
+  productId:       String
+  appAccountToken: String!        # attach to purchases (iOS appAccountToken / Android obfuscatedAccountId)
+}
+
 # ── Recommendations ───────────────────────────────────────────────────────────
 type RecommendedLesson {
   lesson: Lesson!
@@ -290,6 +316,13 @@ input UpdateLessonInput {
   isPublished:     Boolean
 }
 
+input VerifyPurchaseInput {
+  platform:      StorePlatform!
+  productId:     String!
+  transactionId: String         # iOS: StoreKit transaction ID
+  purchaseToken: String         # Android: Google Play purchase token
+}
+
 input UpdateUserGroupInput {
   groupId:       ID!
   exportDefaults: AWSJSON
@@ -300,6 +333,9 @@ input UpdateUserGroupInput {
 # Queries
 # ─────────────────────────────────────────────────────────────────────────────
 type Query {
+  # Subscription (always allowed, so expired users can see the paywall)
+  getSubscriptionStatus: SubscriptionInfo!
+
   # CPD
   getCpdActivity(activityId: ID!): CpdActivity
   listCpdActivities(
@@ -315,7 +351,7 @@ type Query {
   listDrafts(limit: Int, nextToken: String): DraftConnection!
   getDraft(draftId: ID!): Draft
 
-  # Lessons (Premium)
+  # Lessons
   getLesson(lessonId: ID!): Lesson
   listLessons(
     categoryId: String
@@ -344,6 +380,9 @@ type Query {
 # Mutations
 # ─────────────────────────────────────────────────────────────────────────────
 type Mutation {
+  # Subscription: verify an App Store / Google Play purchase with the store
+  verifyPurchase(input: VerifyPurchaseInput!): SubscriptionInfo!
+
   # CPD activities
   createCpdActivity(input: CreateCpdActivityInput!): CpdActivity!
   updateCpdActivity(input: UpdateCpdActivityInput!): CpdActivity!

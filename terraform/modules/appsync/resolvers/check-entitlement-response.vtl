@@ -1,0 +1,13 @@
+## check-entitlement: reject the request unless the free trial or a paid
+## subscription is still current. errorType "SubscriptionRequired" tells the
+## app to re-check with the store and show the paywall.
+#if($context.error)
+  $util.error($context.error.message, $context.error.type)
+#end
+#set($now = $util.time.nowEpochSeconds())
+#set($trialEndsAt = $util.defaultIfNull($context.result.trialEndsAt, 0))
+#set($paidEndsAt = $util.defaultIfNull($context.result.entitlementExpiresAt, 0))
+#if($trialEndsAt <= $now && $paidEndsAt <= $now)
+  $util.error("Your MoC-mate free month has ended. Subscribe to keep using the app.", "SubscriptionRequired")
+#end
+{}

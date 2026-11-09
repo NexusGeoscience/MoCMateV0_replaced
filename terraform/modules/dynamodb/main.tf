@@ -238,3 +238,40 @@ resource "aws_dynamodb_table" "categories" {
 
   tags = { Name = "${local.prefix}-categories" }
 }
+
+# ── Subscriptions (app access) ────────────────────────────────────────────────
+# PK: userId (Auth0 sub). One record per user.
+#   trialStartedAt / trialEndsAt   epoch seconds, set on the user's first API call
+#   entitlementExpiresAt           epoch seconds, end of paid access (0 = none)
+#   storeRef                       "IOS#<originalTransactionId>" | "ANDROID#<purchaseToken>"
+# Read on every gated AppSync request by the check-entitlement pipeline function.
+resource "aws_dynamodb_table" "subscriptions" {
+  name         = "${local.prefix}-subscriptions"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "userId"
+
+  attribute {
+    name = "userId"
+    type = "S"
+  }
+
+  # GSI: find the user when Apple / Google send a renewal / cancellation notice
+  attribute {
+    name = "storeRef"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "storeRef-index"
+    hash_key        = "storeRef"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery { enabled = true }
+  server_side_encryption { enabled = true }
+
+  # Losing this table would re-grant everyone a free trial
+  deletion_protection_enabled = true
+
+  tags = { Name = "${local.prefix}-subscriptions" }
+}
